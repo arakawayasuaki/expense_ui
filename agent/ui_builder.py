@@ -16,6 +16,155 @@ from __future__ import annotations
 
 from typing import Any
 
+import json
+import logging
+import os
+
+from openai import OpenAI
+
+logger = logging.getLogger(__name__)
+
+_REVIEW_SURFACE_ID = "expense-review"
+_DEFAULT_MODEL = "gpt-4o-mini"
+
+
+def _build_review_fallback(data: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        {
+            "beginRendering": {
+                "surfaceId": _REVIEW_SURFACE_ID,
+                "root": "review-root",
+                "styles": {"primaryColor": "#2F5AFF", "font": "Roboto"},
+            }
+        },
+        {
+            "surfaceUpdate": {
+                "surfaceId": _REVIEW_SURFACE_ID,
+                "components": [
+                    {
+                        "id": "review-root",
+                        "component": {
+                            "Column": {
+                                "children": {
+                                    "explicitList": [
+                                        "review-title",
+                                        "review-receipt",
+                                        "review-merchant",
+                                        "review-date",
+                                        "review-amount",
+                                        "review-currency",
+                                        "review-category",
+                                        "review-payment",
+                                        "review-memo",
+                                        "submit-button",
+                                    ]
+                                }
+                            }
+                        },
+                    },
+                    {
+                        "id": "review-title",
+                        "component": {
+                            "Text": {
+                                "usageHint": "h2",
+                                "text": {"literalString": "申請内容の確認"},
+                            }
+                        },
+                    },
+                    {"id": "review-receipt", "component": {"Text": {"text": {"path": "receiptName"}}}},
+                    {"id": "review-merchant", "component": {"Text": {"text": {"path": "merchant"}}}},
+                    {"id": "review-date", "component": {"Text": {"text": {"path": "date"}}}},
+                    {"id": "review-amount", "component": {"Text": {"text": {"path": "amount"}}}},
+                    {"id": "review-currency", "component": {"Text": {"text": {"path": "currency"}}}},
+                    {"id": "review-category", "component": {"Text": {"text": {"path": "category"}}}},
+                    {"id": "review-payment", "component": {"Text": {"text": {"path": "paymentMethod"}}}},
+                    {"id": "review-memo", "component": {"Text": {"text": {"path": "memo"}}}},
+                    {
+                        "id": "submit-button",
+                        "component": {
+                            "Button": {
+                                "child": "submit-button-text",
+                                "primary": True,
+                                "action": {
+                                    "name": "submit_expense",
+                                    "context": [
+                                        {"key": "receiptName", "value": {"path": "receiptName"}},
+                                        {"key": "merchant", "value": {"path": "merchant"}},
+                                        {"key": "date", "value": {"path": "date"}},
+                                        {"key": "amount", "value": {"path": "amount"}},
+                                        {"key": "currency", "value": {"path": "currency"}},
+                                        {"key": "category", "value": {"path": "category"}},
+                                        {"key": "paymentMethod", "value": {"path": "paymentMethod"}},
+                                        {"key": "memo", "value": {"path": "memo"}},
+                                    ],
+                                },
+                            }
+                        },
+                    },
+                    {
+                        "id": "submit-button-text",
+                        "component": {"Text": {"text": {"literalString": "申請する"}}},
+                    },
+                ],
+            }
+        },
+        {
+            "dataModelUpdate": {
+                "surfaceId": _REVIEW_SURFACE_ID,
+                "path": "/",
+                "contents": [
+                    {"key": "receiptName", "valueString": data.get("receiptName", "")},
+                    {"key": "merchant", "valueString": data.get("merchant", "")},
+                    {"key": "date", "valueString": data.get("date", "")},
+                    {"key": "amount", "valueString": data.get("amount", "")},
+                    {"key": "currency", "valueString": data.get("currency", "JPY")},
+                    {"key": "category", "valueString": data.get("category", "")},
+                    {"key": "paymentMethod", "valueString": data.get("paymentMethod", "")},
+                    {"key": "memo", "valueString": data.get("memo", "")},
+                ],
+            }
+        },
+    ]
+
+
+def build_ai_review(data: dict[str, Any]) -> list[dict[str, Any]]:
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        logger.warning("OPENAI_API_KEY not set; falling back to static review UI.")
+        return _build_review_fallback(data)
+
+    client = OpenAI(api_key=api_key)
+    model = os.getenv("OPENAI_MODEL", _DEFAULT_MODEL)
+    prompt = {
+        "role": "user",
+        "content": (
+            "You generate A2UI JSON messages. Build a concise review page UI for an expense report.\n"
+            "Requirements:\n"
+            "- Output ONLY a JSON array of A2UI messages (list of objects).\n"
+            "- Use surfaceId: \"expense-review\" and root id: \"review-root\".\n"
+            "- Include Text components for receiptName, merchant, date, amount, currency, category, paymentMethod, memo.\n"
+            "- Include a primary Button with action name \"submit_expense\" that passes those fields via context paths.\n"
+            "- Use styles primaryColor #2F5AFF and font Roboto.\n"
+            f"Data:\n{json.dumps(data, ensure_ascii=False)}"
+        ),
+    }
+    response = client.responses.create(
+        model=model,
+        input=[prompt],
+        temperature=0.2,
+    )
+    raw = response.output_text.strip()
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        logger.warning("Failed to parse AI response as JSON; falling back.")
+        return _build_review_fallback(data)
+
+    if not isinstance(parsed, list):
+        logger.warning("AI response is not a list; falling back.")
+        return _build_review_fallback(data)
+    return parsed
+
 
 def build_expense_form(data: dict[str, Any]) -> list[dict[str, Any]]:
     return [

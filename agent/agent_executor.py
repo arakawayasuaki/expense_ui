@@ -27,7 +27,7 @@ from a2ui.a2ui_extension import create_a2ui_part, try_activate_a2ui_extension
 
 from ocr import extract_from_base64
 from storage import add_claim, search_claims
-from ui_builder import build_confirmation, build_expense_form, build_search_results
+from ui_builder import build_ai_review, build_confirmation, build_search_results
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +113,7 @@ class ExpenseAgentExecutor(AgentExecutor):
                 "paymentMethod": "",
                 "memo": "",
             }
-            messages = build_expense_form(form_data)
+            messages = build_ai_review(form_data)
         elif action_name == "submit_expense":
             payload = {
                 "receiptName": action_context.get("receiptName", ""),
