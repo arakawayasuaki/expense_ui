@@ -148,12 +148,19 @@ def build_ai_review(data: dict[str, Any]) -> list[dict[str, Any]]:
             f"Data:\n{json.dumps(data, ensure_ascii=False)}"
         ),
     }
-    response = client.responses.create(
-        model=model,
-        input=[prompt],
-        temperature=0.2,
-    )
+    try:
+        response = client.responses.create(
+            model=model,
+            input=[prompt],
+            temperature=0.2,
+        )
+    except Exception as exc:
+        logger.warning("OpenAI request failed; falling back. error=%s", exc)
+        return _build_review_fallback(data)
+
     raw = response.output_text.strip()
+    if raw:
+        logger.info("OpenAI review UI response (truncated): %s", raw[:800])
     try:
         parsed = json.loads(raw)
     except json.JSONDecodeError:
