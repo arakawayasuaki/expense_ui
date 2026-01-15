@@ -61,13 +61,21 @@ def _build_review_fallback(data: dict[str, Any]) -> list[dict[str, Any]]:
                                 "children": {
                                     "explicitList": [
                                         "review-title",
+                                        "review-receipt-label",
                                         "review-receipt",
+                                        "review-merchant-label",
                                         "review-merchant",
+                                        "review-date-label",
                                         "review-date",
+                                        "review-amount-label",
                                         "review-amount",
+                                        "review-currency-label",
                                         "review-currency",
+                                        "review-category-label",
                                         "review-category",
+                                        "review-payment-label",
                                         "review-payment",
+                                        "review-memo-label",
                                         "review-memo",
                                         "submit-button",
                                     ]
@@ -84,13 +92,45 @@ def _build_review_fallback(data: dict[str, Any]) -> list[dict[str, Any]]:
                             }
                         },
                     },
+                    {
+                        "id": "review-receipt-label",
+                        "component": {"Text": {"text": {"literalString": "領収書"}}},
+                    },
                     {"id": "review-receipt", "component": {"Text": {"text": {"path": "receiptName"}}}},
+                    {
+                        "id": "review-merchant-label",
+                        "component": {"Text": {"text": {"literalString": "支払先"}}},
+                    },
                     {"id": "review-merchant", "component": {"Text": {"text": {"path": "merchant"}}}},
+                    {
+                        "id": "review-date-label",
+                        "component": {"Text": {"text": {"literalString": "日付"}}},
+                    },
                     {"id": "review-date", "component": {"Text": {"text": {"path": "date"}}}},
+                    {
+                        "id": "review-amount-label",
+                        "component": {"Text": {"text": {"literalString": "金額"}}},
+                    },
                     {"id": "review-amount", "component": {"Text": {"text": {"path": "amount"}}}},
+                    {
+                        "id": "review-currency-label",
+                        "component": {"Text": {"text": {"literalString": "通貨"}}},
+                    },
                     {"id": "review-currency", "component": {"Text": {"text": {"path": "currency"}}}},
+                    {
+                        "id": "review-category-label",
+                        "component": {"Text": {"text": {"literalString": "カテゴリ"}}},
+                    },
                     {"id": "review-category", "component": {"Text": {"text": {"path": "category"}}}},
+                    {
+                        "id": "review-payment-label",
+                        "component": {"Text": {"text": {"literalString": "支払方法"}}},
+                    },
                     {"id": "review-payment", "component": {"Text": {"text": {"path": "paymentMethod"}}}},
+                    {
+                        "id": "review-memo-label",
+                        "component": {"Text": {"text": {"literalString": "備考"}}},
+                    },
                     {"id": "review-memo", "component": {"Text": {"text": {"path": "memo"}}}},
                     {
                         "id": "submit-button",
