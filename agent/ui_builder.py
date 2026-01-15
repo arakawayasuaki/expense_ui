@@ -135,23 +135,43 @@ def build_ai_review(data: dict[str, Any]) -> list[dict[str, Any]]:
 
     client = OpenAI(api_key=api_key)
     model = os.getenv("OPENAI_MODEL", _DEFAULT_MODEL)
-    prompt = {
+    system_prompt = {
+        "role": "system",
+        "content": (
+            "You output A2UI JSON only. Do not use markdown or code fences. "
+            "Return a JSON array of A2UI message objects."
+        ),
+    }
+    user_prompt = {
         "role": "user",
         "content": (
-            "You generate A2UI JSON messages. Build a concise review page UI for an expense report.\n"
+            "Create A2UI messages for an expense review page.\n"
             "Requirements:\n"
-            "- Output ONLY a JSON array of A2UI messages (list of objects).\n"
-            "- Use surfaceId: \"expense-review\" and root id: \"review-root\".\n"
-            "- Include Text components for receiptName, merchant, date, amount, currency, category, paymentMethod, memo.\n"
-            "- Include a primary Button with action name \"submit_expense\" that passes those fields via context paths.\n"
-            "- Use styles primaryColor #2F5AFF and font Roboto.\n"
+            "- Output ONLY a JSON array (no markdown, no code fences).\n"
+            "- Use beginRendering, surfaceUpdate, dataModelUpdate message structure.\n"
+            "- surfaceId must be \"expense-review\" and root id must be \"review-root\".\n"
+            "- Use styles: primaryColor \"#2F5AFF\", font \"Roboto\".\n"
+            "- Include Text components bound to receiptName, merchant, date, amount, currency, category, paymentMethod, memo.\n"
+            "- Include a primary Button with action name \"submit_expense\" and context paths for those fields.\n"
+            "Example shape (do not copy values, just follow structure):\n"
+            "[\n"
+            "  {\"beginRendering\": {\"surfaceId\": \"expense-review\", \"root\": \"review-root\", \"styles\": {\"primaryColor\": \"#2F5AFF\", \"font\": \"Roboto\"}}},\n"
+            "  {\"surfaceUpdate\": {\"surfaceId\": \"expense-review\", \"components\": [\n"
+            "    {\"id\": \"review-root\", \"component\": {\"Column\": {\"children\": {\"explicitList\": [\"review-title\", \"review-receipt\", \"review-merchant\", \"review-date\", \"review-amount\", \"review-currency\", \"review-category\", \"review-payment\", \"review-memo\", \"submit-button\"]}}}},\n"
+            "    {\"id\": \"review-title\", \"component\": {\"Text\": {\"usageHint\": \"h2\", \"text\": {\"literalString\": \"申請内容の確認\"}}}},\n"
+            "    {\"id\": \"review-receipt\", \"component\": {\"Text\": {\"text\": {\"path\": \"receiptName\"}}}},\n"
+            "    {\"id\": \"submit-button\", \"component\": {\"Button\": {\"child\": \"submit-button-text\", \"primary\": true, \"action\": {\"name\": \"submit_expense\", \"context\": [{\"key\": \"receiptName\", \"value\": {\"path\": \"receiptName\"}}]}}}},\n"
+            "    {\"id\": \"submit-button-text\", \"component\": {\"Text\": {\"text\": {\"literalString\": \"申請する\"}}}}\n"
+            "  ]}},\n"
+            "  {\"dataModelUpdate\": {\"surfaceId\": \"expense-review\", \"path\": \"/\", \"contents\": []}}\n"
+            "]\n"
             f"Data:\n{json.dumps(data, ensure_ascii=False)}"
         ),
     }
     try:
         response = client.responses.create(
             model=model,
-            input=[prompt],
+            input=[system_prompt, user_prompt],
             temperature=0.2,
         )
     except Exception as exc:
@@ -161,8 +181,16 @@ def build_ai_review(data: dict[str, Any]) -> list[dict[str, Any]]:
     raw = response.output_text.strip()
     if raw:
         logger.info("OpenAI review UI response (truncated): %s", raw[:800])
+    sanitized = raw
+    if "```" in sanitized:
+        sanitized = sanitized.replace("```json", "").replace("```", "").strip()
+    start = sanitized.find("[")
+    end = sanitized.rfind("]")
+    if start != -1 and end != -1:
+        sanitized = sanitized[start : end + 1]
+
     try:
-        parsed = json.loads(raw)
+        parsed = json.loads(sanitized)
     except json.JSONDecodeError:
         logger.warning("Failed to parse AI response as JSON; falling back.")
         return _build_review_fallback(data)
@@ -170,6 +198,11 @@ def build_ai_review(data: dict[str, Any]) -> list[dict[str, Any]]:
     if not isinstance(parsed, list):
         logger.warning("AI response is not a list; falling back.")
         return _build_review_fallback(data)
+
+    if not any("beginRendering" in message for message in parsed):
+        logger.warning("AI response missing beginRendering; falling back.")
+        return _build_review_fallback(data)
+
     return parsed
 
 
