@@ -725,11 +725,16 @@ def build_search_results(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def build_entries_screen(
     entries: list[dict[str, Any]], layout: dict[str, Any]
 ) -> list[dict[str, Any]]:
+    if not isinstance(layout, dict):
+        layout = {}
     mode = str(layout.get("mode", "list")).lower()
     show_fields = layout.get(
         "showFields", ["title", "date", "amount", "currency", "memo"]
     )
+    if isinstance(show_fields, str):
+        show_fields = [show_fields]
     show_fields = [str(field) for field in show_fields]
+    surface_id = f"entries-{mode}-{'-'.join(show_fields) or 'none'}"
     items = []
     for idx, entry in enumerate(entries, start=1):
         amount_display = f"{entry.get('amount', '')} {entry.get('currency', '')}".strip()
@@ -778,20 +783,26 @@ def build_entries_screen(
     return [
         {
             "beginRendering": {
-                "surfaceId": "entries",
+                "surfaceId": surface_id,
                 "root": "entries-root",
                 "styles": {"primaryColor": "#2F5AFF", "font": "Roboto"},
             }
         },
         {
             "surfaceUpdate": {
-                "surfaceId": "entries",
+                "surfaceId": surface_id,
                 "components": [
                     {
                         "id": "entries-root",
                         "component": {
                             "Column": {
-                                "children": {"explicitList": ["entries-title", "entries-list"]}
+                                "children": {
+                                    "explicitList": [
+                                        "entries-title",
+                                        "entries-mode",
+                                        "entries-list",
+                                    ]
+                                }
                             }
                         },
                     },
@@ -801,6 +812,16 @@ def build_entries_screen(
                             "Text": {
                                 "usageHint": "h2",
                                 "text": {"literalString": "経費エントリー一覧"},
+                            }
+                        },
+                    },
+                    {
+                        "id": "entries-mode",
+                        "component": {
+                            "Text": {
+                                "text": {
+                                    "literalString": f"表示モード: {mode.upper()} / fields: {', '.join(show_fields) or 'none'}"
+                                }
                             }
                         },
                     },
@@ -836,7 +857,7 @@ def build_entries_screen(
         },
         {
             "dataModelUpdate": {
-                "surfaceId": "entries",
+                "surfaceId": surface_id,
                 "path": "/",
                 "contents": [
                     {"key": "items", "valueMap": items},

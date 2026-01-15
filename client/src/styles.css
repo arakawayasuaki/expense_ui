@@ -48,6 +48,20 @@ body {
   color: #fff;
 }
 
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.row label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .error {
   padding: 12px;
   background: #ffe8e8;

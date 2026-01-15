@@ -152,9 +152,15 @@ def main(host, port):
 
     async def entries_endpoint(request: Request) -> JSONResponse:
         payload = load_entries()
-        return JSONResponse(
-            build_entries_screen(payload.get("entries", []), payload.get("layout", {}))
-        )
+        layout = payload.get("layout", {})
+        params = request.query_params
+        mode = params.get("mode")
+        fields = params.get("fields")
+        if mode:
+            layout = {**layout, "mode": mode}
+        if fields:
+            layout = {**layout, "showFields": [f for f in fields.split(",") if f]}
+        return JSONResponse(build_entries_screen(payload.get("entries", []), layout))
 
     app.add_route("/ocr", ocr_endpoint, methods=["POST"])
     app.add_route("/review", review_endpoint, methods=["POST"])
