@@ -19,6 +19,9 @@ export default function EntriesApp() {
     "currency",
     "memo",
   ]);
+  const [theme, setTheme] = useState<"default" | "forest" | "sunset">(
+    "default"
+  );
 
   const processor = useMemo(
     () => v0_8.Data.createSignalA2uiMessageProcessor(),
@@ -40,6 +43,7 @@ export default function EntriesApp() {
       try {
         const params = new URLSearchParams();
         params.set("mode", layoutMode);
+        params.set("theme", theme);
         params.set("fields", visibleFields.join(","));
         const response = await fetch(
           `${ENTRIES_ENDPOINT}/entries?${params.toString()}`
@@ -57,7 +61,7 @@ export default function EntriesApp() {
       }
     };
     void run();
-  }, [processor, layoutMode, visibleFields]);
+  }, [processor, layoutMode, visibleFields, theme]);
 
   return (
     <div className="app">
@@ -88,6 +92,21 @@ export default function EntriesApp() {
               onChange={() => setLayoutMode("grid")}
             />
             グリッド
+          </label>
+        </div>
+        <div className="row">
+          <label>
+            テーマ
+            <select
+              value={theme}
+              onChange={(event) =>
+                setTheme(event.target.value as "default" | "forest" | "sunset")
+              }
+            >
+              <option value="default">Default</option>
+              <option value="forest">Forest</option>
+              <option value="sunset">Sunset</option>
+            </select>
           </label>
         </div>
         <div className="row">

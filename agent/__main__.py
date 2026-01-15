@@ -156,10 +156,13 @@ def main(host, port):
         params = request.query_params
         mode = params.get("mode")
         fields = params.get("fields")
+        theme = params.get("theme")
         if mode:
             layout = {**layout, "mode": mode}
         if fields:
             layout = {**layout, "showFields": [f for f in fields.split(",") if f]}
+        if theme:
+            layout = {**layout, "theme": theme}
         return JSONResponse(build_entries_screen(payload.get("entries", []), layout))
 
     app.add_route("/ocr", ocr_endpoint, methods=["POST"])

@@ -1,6 +1,7 @@
 {
   "layout": {
     "mode": "grid",
+    "theme": "default",
     "showFields": ["title", "date", "amount", "currency", "memo"]
   },
   "entries": [

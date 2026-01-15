@@ -734,6 +734,13 @@ def build_entries_screen(
     if isinstance(show_fields, str):
         show_fields = [show_fields]
     show_fields = [str(field) for field in show_fields]
+    theme = str(layout.get("theme", "default")).lower()
+    themes = {
+        "default": {"primaryColor": "#2F5AFF", "font": "Roboto"},
+        "forest": {"primaryColor": "#1F7A5C", "font": "Roboto"},
+        "sunset": {"primaryColor": "#D95032", "font": "Roboto"},
+    }
+    styles = themes.get(theme, themes["default"])
     surface_id = f"entries-{mode}-{'-'.join(show_fields) or 'none'}"
     items = []
     for idx, entry in enumerate(entries, start=1):
@@ -785,7 +792,7 @@ def build_entries_screen(
             "beginRendering": {
                 "surfaceId": surface_id,
                 "root": "entries-root",
-                "styles": {"primaryColor": "#2F5AFF", "font": "Roboto"},
+                "styles": styles,
             }
         },
         {
@@ -820,7 +827,11 @@ def build_entries_screen(
                         "component": {
                             "Text": {
                                 "text": {
-                                    "literalString": f"表示モード: {mode.upper()} / fields: {', '.join(show_fields) or 'none'}"
+                                    "literalString": (
+                                        f"表示モード: {mode.upper()} / "
+                                        f"テーマ: {theme.upper()} / "
+                                        f"fields: {', '.join(show_fields) or 'none'}"
+                                    )
                                 }
                             }
                         },
