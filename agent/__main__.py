@@ -29,6 +29,7 @@ from starlette.responses import JSONResponse
 
 from agent_executor import ExpenseAgentExecutor
 from ocr import extract_from_base64
+from ui_builder import build_ai_review
 
 load_dotenv()
 
@@ -110,7 +111,46 @@ def main(host, port):
             }
         )
 
+    async def review_endpoint(request: Request) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            return JSONResponse({"error": "Invalid JSON payload"}, status_code=400)
+
+        file_base64 = payload.get("fileBase64")
+        file_name = payload.get("fileName", "receipt")
+        file_type = payload.get("fileType", "image/png")
+        if not file_base64:
+            return JSONResponse({"error": "fileBase64 is required"}, status_code=400)
+
+        try:
+            result = extract_from_base64(file_base64, file_type, file_name)
+        except (base64.binascii.Error, ValueError, UnidentifiedImageError) as exc:
+            return JSONResponse(
+                {"error": f"Invalid receipt payload: {exc}"},
+                status_code=400,
+            )
+        except Exception as exc:
+            return JSONResponse(
+                {"error": f"OCR failed: {exc}"},
+                status_code=500,
+            )
+
+        form_data = {
+            "receiptName": file_name,
+            "merchant": result.merchant,
+            "date": result.date,
+            "amount": result.amount,
+            "currency": result.currency,
+            "category": "",
+            "paymentMethod": "",
+            "memo": "",
+        }
+        messages = build_ai_review(form_data)
+        return JSONResponse(messages)
+
     app.add_route("/ocr", ocr_endpoint, methods=["POST"])
+    app.add_route("/review", review_endpoint, methods=["POST"])
     app.add_middleware(
         CORSMiddleware,
         allow_origin_regex=r"https?://.*",

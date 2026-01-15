@@ -18,14 +18,6 @@ type ExpenseRecord = ExpenseFormData & {
   createdAt: string;
 };
 
-type OcrResponse = {
-  text: string;
-  merchant: string;
-  date: string;
-  amount: string;
-  currency: string;
-};
-
 const STORAGE_KEY = "expenseClaims";
 const OCR_ENDPOINT =
   import.meta.env.VITE_OCR_ENDPOINT ?? "http://localhost:10002";
@@ -91,9 +83,11 @@ const fileToBase64 = (file: File) =>
     reader.readAsDataURL(file);
   });
 
-const runOcr = async (file: File): Promise<OcrResponse> => {
+const runReview = async (
+  file: File
+): Promise<v0_8.Types.ServerToClientMessage[]> => {
   const fileBase64 = await fileToBase64(file);
-  const response = await fetch(`${OCR_ENDPOINT}/ocr`, {
+  const response = await fetch(`${OCR_ENDPOINT}/review`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -108,7 +102,7 @@ const runOcr = async (file: File): Promise<OcrResponse> => {
     throw new Error(message || "OCR request failed");
   }
 
-  return (await response.json()) as OcrResponse;
+  return (await response.json()) as v0_8.Types.ServerToClientMessage[];
 };
 
 const buildExpenseForm = (data: ExpenseFormData) => [
@@ -520,18 +514,8 @@ export default function App() {
       processor.clearSurfaces();
       setSurfaces([]);
       try {
-        const ocr = await runOcr(file);
-        const formData: ExpenseFormData = {
-          receiptName: file.name,
-          merchant: ocr.merchant,
-          date: ocr.date,
-          amount: ocr.amount,
-          currency: ocr.currency,
-          category: "",
-          paymentMethod: "",
-          memo: "",
-        };
-        processMessages(buildExpenseForm(formData));
+        const messages = await runReview(file);
+        processMessages(messages);
       } catch (err) {
         setError((err as Error).message);
       } finally {
