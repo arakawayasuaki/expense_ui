@@ -1,0 +1,32 @@
+{
+  "layout": {
+    "mode": "grid",
+    "showFields": ["title", "date", "amount", "currency", "memo"]
+  },
+  "entries": [
+    {
+      "id": "entry-001",
+      "title": "出張交通費",
+      "date": "2025/12/03",
+      "amount": "12000.00",
+      "currency": "JPY",
+      "memo": "東京-大阪 新幹線"
+    },
+    {
+      "id": "entry-002",
+      "title": "取引先ランチ",
+      "date": "2025/12/05",
+      "amount": "4200.00",
+      "currency": "JPY",
+      "memo": "渋谷 会食"
+    },
+    {
+      "id": "entry-003",
+      "title": "クラウド利用料",
+      "date": "2025/12/10",
+      "amount": "89.00",
+      "currency": "USD",
+      "memo": "AWS 月次"
+    }
+  ]
+}

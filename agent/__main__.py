@@ -28,8 +28,9 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from agent_executor import ExpenseAgentExecutor
+from entries import load_entries
 from ocr import extract_from_base64
-from ui_builder import build_ai_review
+from ui_builder import build_ai_review, build_entries_screen
 
 load_dotenv()
 
@@ -149,8 +150,15 @@ def main(host, port):
         messages = build_ai_review(form_data)
         return JSONResponse(messages)
 
+    async def entries_endpoint(request: Request) -> JSONResponse:
+        payload = load_entries()
+        return JSONResponse(
+            build_entries_screen(payload.get("entries", []), payload.get("layout", {}))
+        )
+
     app.add_route("/ocr", ocr_endpoint, methods=["POST"])
     app.add_route("/review", review_endpoint, methods=["POST"])
+    app.add_route("/entries", entries_endpoint, methods=["GET"])
     app.add_middleware(
         CORSMiddleware,
         allow_origin_regex=r"https?://.*",

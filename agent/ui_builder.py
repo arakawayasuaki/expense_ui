@@ -720,3 +720,127 @@ def build_search_results(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
             }
         },
     ]
+
+
+def build_entries_screen(
+    entries: list[dict[str, Any]], layout: dict[str, Any]
+) -> list[dict[str, Any]]:
+    mode = str(layout.get("mode", "list")).lower()
+    show_fields = layout.get(
+        "showFields", ["title", "date", "amount", "currency", "memo"]
+    )
+    show_fields = [str(field) for field in show_fields]
+    items = []
+    for idx, entry in enumerate(entries, start=1):
+        amount_display = f"{entry.get('amount', '')} {entry.get('currency', '')}".strip()
+        item_map = []
+        if "title" in show_fields:
+            item_map.append({"key": "title", "valueString": entry.get("title", "")})
+        if "date" in show_fields:
+            item_map.append({"key": "date", "valueString": entry.get("date", "")})
+        if "amount" in show_fields or "currency" in show_fields:
+            item_map.append({"key": "amountDisplay", "valueString": amount_display})
+        if "memo" in show_fields:
+            item_map.append({"key": "memo", "valueString": entry.get("memo", "")})
+        items.append(
+            {
+                "key": f"entry{idx}",
+                "valueMap": item_map,
+            }
+        )
+
+    field_components = []
+    explicit_list = []
+    if "title" in show_fields:
+        field_components.append(
+            {"id": "entry-title", "component": {"Text": {"text": {"path": "title"}}}}
+        )
+        explicit_list.append("entry-title")
+    if "date" in show_fields:
+        field_components.append(
+            {"id": "entry-date", "component": {"Text": {"text": {"path": "date"}}}}
+        )
+        explicit_list.append("entry-date")
+    if "amount" in show_fields or "currency" in show_fields:
+        field_components.append(
+            {
+                "id": "entry-amount",
+                "component": {"Text": {"text": {"path": "amountDisplay"}}},
+            }
+        )
+        explicit_list.append("entry-amount")
+    if "memo" in show_fields:
+        field_components.append(
+            {"id": "entry-memo", "component": {"Text": {"text": {"path": "memo"}}}}
+        )
+        explicit_list.append("entry-memo")
+
+    return [
+        {
+            "beginRendering": {
+                "surfaceId": "entries",
+                "root": "entries-root",
+                "styles": {"primaryColor": "#2F5AFF", "font": "Roboto"},
+            }
+        },
+        {
+            "surfaceUpdate": {
+                "surfaceId": "entries",
+                "components": [
+                    {
+                        "id": "entries-root",
+                        "component": {
+                            "Column": {
+                                "children": {"explicitList": ["entries-title", "entries-list"]}
+                            }
+                        },
+                    },
+                    {
+                        "id": "entries-title",
+                        "component": {
+                            "Text": {
+                                "usageHint": "h2",
+                                "text": {"literalString": "経費エントリー一覧"},
+                            }
+                        },
+                    },
+                    {
+                        "id": "entries-list",
+                        "component": {
+                            "List": {
+                                "direction": "horizontal" if mode == "grid" else "vertical",
+                                "children": {
+                                    "template": {
+                                        "dataBinding": "/items",
+                                        "componentId": "entry-card-template",
+                                    }
+                                },
+                            }
+                        },
+                    },
+                    {
+                        "id": "entry-card-template",
+                        "component": {"Card": {"child": "entry-card-column"}},
+                    },
+                    {
+                        "id": "entry-card-column",
+                        "component": {
+                            "Column": {
+                                "children": {"explicitList": explicit_list}
+                            }
+                        },
+                    },
+                    *field_components,
+                ],
+            }
+        },
+        {
+            "dataModelUpdate": {
+                "surfaceId": "entries",
+                "path": "/",
+                "contents": [
+                    {"key": "items", "valueMap": items},
+                ],
+            }
+        },
+    ]
