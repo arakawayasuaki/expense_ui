@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import base64
 import logging
 
 import click
@@ -21,6 +22,7 @@ from a2a.server.tasks import InMemoryTaskStore
 from a2a.types import AgentCapabilities, AgentCard, AgentSkill
 from a2ui.a2ui_extension import get_a2ui_agent_extension
 from dotenv import load_dotenv
+from PIL import UnidentifiedImageError
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -86,7 +88,18 @@ def main(host, port):
         if not file_base64:
             return JSONResponse({"error": "fileBase64 is required"}, status_code=400)
 
-        result = extract_from_base64(file_base64, file_type, file_name)
+        try:
+            result = extract_from_base64(file_base64, file_type, file_name)
+        except (base64.binascii.Error, ValueError, UnidentifiedImageError) as exc:
+            return JSONResponse(
+                {"error": f"Invalid receipt payload: {exc}"},
+                status_code=400,
+            )
+        except Exception as exc:
+            return JSONResponse(
+                {"error": f"OCR failed: {exc}"},
+                status_code=500,
+            )
         return JSONResponse(
             {
                 "text": result.text,
