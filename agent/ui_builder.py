@@ -213,10 +213,22 @@ def _ensure_review_components(
 ) -> list[dict[str, Any]]:
     fallback = _build_review_fallback(data)
     fallback_components: list[dict[str, Any]] = []
+    fallback_order: list[str] = []
     for message in fallback:
         update = message.get("surfaceUpdate")
         if update and update.get("surfaceId") == _REVIEW_SURFACE_ID:
             fallback_components = update.get("components", [])
+            for component in fallback_components:
+                if component.get("id") == "review-root":
+                    try:
+                        fallback_order = (
+                            component.get("component", {})
+                            .get("Column", {})
+                            .get("children", {})
+                            .get("explicitList", [])
+                        )
+                    except AttributeError:
+                        fallback_order = []
             break
 
     required_by_id = {
@@ -252,6 +264,24 @@ def _ensure_review_components(
     for component_id, component in required_by_id.items():
         if component_id not in existing_ids:
             components.append(component)
+
+    # Ensure the explicitList includes required components in order.
+    for component in components:
+        if component.get("id") != "review-root":
+            continue
+        column = component.get("component", {}).get("Column")
+        if not isinstance(column, dict):
+            continue
+        children = column.get("children")
+        if not isinstance(children, dict):
+            continue
+        explicit_list = children.get("explicitList")
+        if not isinstance(explicit_list, list):
+            children["explicitList"] = fallback_order or list(required_by_id.keys())
+            continue
+        for item_id in fallback_order:
+            if item_id not in explicit_list:
+                explicit_list.append(item_id)
     return messages
 
 
