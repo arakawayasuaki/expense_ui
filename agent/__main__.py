@@ -22,8 +22,11 @@ from a2a.types import AgentCapabilities, AgentCard, AgentSkill
 from a2ui.a2ui_extension import get_a2ui_agent_extension
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 from agent_executor import ExpenseAgentExecutor
+from ocr import extract_from_base64
 
 load_dotenv()
 
@@ -70,9 +73,34 @@ def main(host, port):
     import uvicorn
 
     app = server.build()
+
+    async def ocr_endpoint(request: Request) -> JSONResponse:
+        try:
+            payload = await request.json()
+        except Exception:
+            return JSONResponse({"error": "Invalid JSON payload"}, status_code=400)
+
+        file_base64 = payload.get("fileBase64")
+        file_name = payload.get("fileName", "receipt")
+        file_type = payload.get("fileType", "image/png")
+        if not file_base64:
+            return JSONResponse({"error": "fileBase64 is required"}, status_code=400)
+
+        result = extract_from_base64(file_base64, file_type, file_name)
+        return JSONResponse(
+            {
+                "text": result.text,
+                "merchant": result.merchant,
+                "date": result.date,
+                "amount": result.amount,
+                "currency": result.currency,
+            }
+        )
+
+    app.add_route("/ocr", ocr_endpoint, methods=["POST"])
     app.add_middleware(
         CORSMiddleware,
-        allow_origin_regex=r"http://localhost:\d+",
+        allow_origin_regex=r"https?://.*",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

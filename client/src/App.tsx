@@ -1,11 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { v0_8 } from "@a2ui/lit";
 import { A2UISurface } from "./components/A2UISurface";
-import Tesseract from "tesseract.js";
-import { getDocument, GlobalWorkerOptions } from "pdfjs-dist/legacy/build/pdf";
-import pdfWorkerSrc from "pdfjs-dist/legacy/build/pdf.worker.mjs?url";
-
-GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
 
 type ExpenseFormData = {
   receiptName: string;
@@ -23,7 +18,17 @@ type ExpenseRecord = ExpenseFormData & {
   createdAt: string;
 };
 
+type OcrResponse = {
+  text: string;
+  merchant: string;
+  date: string;
+  amount: string;
+  currency: string;
+};
+
 const STORAGE_KEY = "expenseClaims";
+const OCR_ENDPOINT =
+  import.meta.env.VITE_OCR_ENDPOINT ?? "http://localhost:10002";
 
 const loadClaims = (): ExpenseRecord[] => {
   const raw = localStorage.getItem(STORAGE_KEY);
@@ -72,118 +77,38 @@ const searchClaims = (query: string) => {
   );
 };
 
-const imageFromFile = async (file: File) => {
-  const bitmap = await createImageBitmap(file);
-  const canvas = document.createElement("canvas");
-  canvas.width = bitmap.width;
-  canvas.height = bitmap.height;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    throw new Error("Failed to create canvas context");
-  }
-  ctx.drawImage(bitmap, 0, 0);
-  return canvas;
-};
-
-const pdfToCanvas = async (file: File, scale: number = 4) => {
-  const data = await file.arrayBuffer();
-  const pdf = await getDocument({ data }).promise;
-  const page = await pdf.getPage(1);
-  const viewport = page.getViewport({ scale });
-  const canvas = document.createElement("canvas");
-  canvas.width = viewport.width;
-  canvas.height = viewport.height;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    throw new Error("Failed to create canvas context");
-  }
-  await page.render({ canvasContext: ctx, viewport }).promise;
-  return canvas;
-};
-
-const preprocessCanvas = (canvas: HTMLCanvasElement) => {
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    return canvas;
-  }
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const data = imageData.data;
-  const contrast = 1.2;
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i];
-    const g = data[i + 1];
-    const b = data[i + 2];
-    const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-    const adjusted = Math.min(255, Math.max(0, (gray - 128) * contrast + 128));
-    const value = adjusted > 160 ? 255 : 0;
-    data[i] = value;
-    data[i + 1] = value;
-    data[i + 2] = value;
-  }
-  ctx.putImageData(imageData, 0, 0);
-  return canvas;
-};
-
-const detectCurrency = (text: string) => {
-  if (text.includes("USD") || text.includes("$")) return "USD";
-  if (text.includes("EUR") || text.includes("€")) return "EUR";
-  if (text.includes("¥") || text.includes("￥")) return "JPY";
-  return "JPY";
-};
-
-const extractDate = (text: string) => {
-  const patterns = [
-    /\b(20\d{2}[/-]\d{1,2}[/-]\d{1,2})\b/,
-    /\b(20\d{2}\.\d{1,2}\.\d{1,2})\b/,
-  ];
-  for (const pattern of patterns) {
-    const match = text.match(pattern);
-    if (match) {
-      return match[1].replace(/\./g, "/");
-    }
-  }
-  return "";
-};
-
-const extractAmount = (text: string) => {
-  const matches = text.match(/(?:¥|￥|\$|€)?\s?([\d,]+(?:\.\d{1,2})?)/g);
-  if (!matches) return "";
-  const numbers = matches
-    .map((value) => value.replace(/[^\d.]/g, ""))
-    .map((value) => Number.parseFloat(value))
-    .filter((value) => !Number.isNaN(value));
-  if (numbers.length === 0) return "";
-  const max = Math.max(...numbers);
-  return max.toFixed(2);
-};
-
-const extractMerchant = (text: string) => {
-  for (const line of text.split("\n")) {
-    const cleaned = line.trim();
-    if (!cleaned) continue;
-    if (/^[\d\W]+$/.test(cleaned)) continue;
-    return cleaned;
-  }
-  return "";
-};
-
-const runOcr = async (file: File) => {
-  const canvas = file.type.includes("pdf")
-    ? await pdfToCanvas(file, 4)
-    : await imageFromFile(file);
-  const preprocessed = preprocessCanvas(canvas);
-  const result = await Tesseract.recognize(preprocessed, "jpn+eng", {
-    logger: () => {},
-    tessedit_pageseg_mode: "6",
+const fileToBase64 = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== "string") {
+        reject(new Error("Failed to read receipt"));
+        return;
+      }
+      resolve(reader.result);
+    };
+    reader.onerror = () => reject(new Error("Failed to read receipt"));
+    reader.readAsDataURL(file);
   });
-  const text = result.data.text ?? "";
-  return {
-    text,
-    merchant: extractMerchant(text),
-    date: extractDate(text),
-    amount: extractAmount(text),
-    currency: detectCurrency(text),
-  };
+
+const runOcr = async (file: File): Promise<OcrResponse> => {
+  const fileBase64 = await fileToBase64(file);
+  const response = await fetch(`${OCR_ENDPOINT}/ocr`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      fileBase64,
+      fileName: file.name,
+      fileType: file.type || "application/octet-stream",
+    }),
+  });
+
+  if (!response.ok) {
+    const message = await response.text().catch(() => "");
+    throw new Error(message || "OCR request failed");
+  }
+
+  return (await response.json()) as OcrResponse;
 };
 
 const buildExpenseForm = (data: ExpenseFormData) => [
