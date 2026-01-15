@@ -1,0 +1,14 @@
+/.git
+/.gitignore
+/.DS_Store
+/.env
+/.env.*
+/**/.pytest_cache
+/**/__pycache__
+/**/.cache
+/client
+/node_modules
+**/node_modules
+**/dist
+**/.vite
+**/*.log
