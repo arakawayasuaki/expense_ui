@@ -168,6 +168,53 @@ def _ensure_review_data_model(
     return messages
 
 
+def _ensure_review_components(
+    messages: list[dict[str, Any]], data: dict[str, Any]
+) -> list[dict[str, Any]]:
+    fallback = _build_review_fallback(data)
+    fallback_components: list[dict[str, Any]] = []
+    for message in fallback:
+        update = message.get("surfaceUpdate")
+        if update and update.get("surfaceId") == _REVIEW_SURFACE_ID:
+            fallback_components = update.get("components", [])
+            break
+
+    required_by_id = {
+        component.get("id"): component
+        for component in fallback_components
+        if component.get("id")
+    }
+
+    surface_update = None
+    for message in messages:
+        update = message.get("surfaceUpdate")
+        if update and update.get("surfaceId") == _REVIEW_SURFACE_ID:
+            surface_update = update
+            break
+
+    if not surface_update:
+        messages.append(
+            {
+                "surfaceUpdate": {
+                    "surfaceId": _REVIEW_SURFACE_ID,
+                    "components": list(required_by_id.values()),
+                }
+            }
+        )
+        return messages
+
+    components = surface_update.get("components")
+    if not isinstance(components, list):
+        surface_update["components"] = list(required_by_id.values())
+        return messages
+
+    existing_ids = {component.get("id") for component in components}
+    for component_id, component in required_by_id.items():
+        if component_id not in existing_ids:
+            components.append(component)
+    return messages
+
+
 def build_ai_review(data: dict[str, Any]) -> list[dict[str, Any]]:
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
@@ -244,6 +291,7 @@ def build_ai_review(data: dict[str, Any]) -> list[dict[str, Any]]:
         logger.warning("AI response missing beginRendering; falling back.")
         return _build_review_fallback(data)
 
+    parsed = _ensure_review_components(parsed, data)
     return _ensure_review_data_model(parsed, data)
 
 
