@@ -15,4 +15,4 @@ WORKDIR /app/agent
 RUN pip install --no-cache-dir .
 
 EXPOSE 10002
-CMD ["python", "-m", "agent", "--host", "0.0.0.0", "--port", "10002"]
+CMD ["python", "/app/agent/__main__.py", "--host", "0.0.0.0", "--port", "10002"]
