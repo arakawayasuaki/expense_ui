@@ -28,6 +28,19 @@ _REVIEW_SURFACE_ID = "expense-review"
 _DEFAULT_MODEL = "gpt-4o-mini"
 
 
+def _review_data_contents(data: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        {"key": "receiptName", "valueString": data.get("receiptName", "")},
+        {"key": "merchant", "valueString": data.get("merchant", "")},
+        {"key": "date", "valueString": data.get("date", "")},
+        {"key": "amount", "valueString": data.get("amount", "")},
+        {"key": "currency", "valueString": data.get("currency", "JPY")},
+        {"key": "category", "valueString": data.get("category", "")},
+        {"key": "paymentMethod", "valueString": data.get("paymentMethod", "")},
+        {"key": "memo", "valueString": data.get("memo", "")},
+    ]
+
+
 def _build_review_fallback(data: dict[str, Any]) -> list[dict[str, Any]]:
     return [
         {
@@ -127,6 +140,34 @@ def _build_review_fallback(data: dict[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
+def _ensure_review_data_model(
+    messages: list[dict[str, Any]], data: dict[str, Any]
+) -> list[dict[str, Any]]:
+    contents = _review_data_contents(data)
+    data_update = None
+    for message in messages:
+        update = message.get("dataModelUpdate")
+        if update and update.get("surfaceId") == _REVIEW_SURFACE_ID:
+            data_update = update
+            break
+
+    if not data_update:
+        messages.append(
+            {
+                "dataModelUpdate": {
+                    "surfaceId": _REVIEW_SURFACE_ID,
+                    "path": "/",
+                    "contents": contents,
+                }
+            }
+        )
+        return messages
+
+    if not data_update.get("contents"):
+        data_update["contents"] = contents
+    return messages
+
+
 def build_ai_review(data: dict[str, Any]) -> list[dict[str, Any]]:
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
@@ -203,7 +244,7 @@ def build_ai_review(data: dict[str, Any]) -> list[dict[str, Any]]:
         logger.warning("AI response missing beginRendering; falling back.")
         return _build_review_fallback(data)
 
-    return parsed
+    return _ensure_review_data_model(parsed, data)
 
 
 def build_expense_form(data: dict[str, Any]) -> list[dict[str, Any]]:
