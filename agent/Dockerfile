@@ -9,6 +9,7 @@ RUN apt-get update \
 WORKDIR /app
 COPY a2ui-extension /app/a2ui-extension
 COPY agent /app/agent
+COPY agent/pyproject.container.toml /app/agent/pyproject.toml
 
 WORKDIR /app/agent
 RUN pip install --no-cache-dir .
